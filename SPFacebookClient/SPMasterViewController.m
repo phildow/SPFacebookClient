@@ -3,12 +3,39 @@
 //  SPFacebookClient
 //
 //  Created by Philip Dow on 5/7/12.
-//  Copyright (c) 2012 Sprouted. All rights reserved.
+//  Copyright (c) 2012 Philip Dow /Sprouted. All rights reserved.
 //
 
-#import "SPMasterViewController.h"
+/*
+Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions are met:
+ 
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ 
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ 
+ * Neither the name of the author nor the names of its contributors may be used
+   to endorse or promote products derived from this software without specific
+   prior written permission.
+ 
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+ FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
+#import "SPMasterViewController.h"
 #import "SPDetailViewController.h"
+#import "SPExampleFacebookClient.h"
 
 @interface SPMasterViewController () {
     NSMutableArray *_objects;
@@ -23,7 +50,8 @@
 {
     self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil];
     if (self) {
-        self.title = NSLocalizedString(@"Master", @"Master");
+        self.title = NSLocalizedString(@"Friends", @"Friends");
+        _objects = [[NSMutableArray alloc] init];
     }
     return self;
 }
@@ -35,13 +63,13 @@
     [super dealloc];
 }
 
+#pragma mark -
+
 - (void)viewDidLoad
 {
     [super viewDidLoad];
 	// Do any additional setup after loading the view, typically from a nib.
-    self.navigationItem.leftBarButtonItem = self.editButtonItem;
-
-    UIBarButtonItem *addButton = [[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd target:self action:@selector(insertNewObject:)] autorelease];
+    UIBarButtonItem *addButton = [[[UIBarButtonItem alloc] initWithTitle:@"Login" style:UIBarButtonItemStylePlain target:self action:@selector(performFacebookLogin:)] autorelease];
     self.navigationItem.rightBarButtonItem = addButton;
 }
 
@@ -56,14 +84,32 @@
     return (interfaceOrientation != UIInterfaceOrientationPortraitUpsideDown);
 }
 
-- (void)insertNewObject:(id)sender
+#pragma mark -
+
+- (void)performFacebookLogin:(id)sender
 {
-    if (!_objects) {
-        _objects = [[NSMutableArray alloc] init];
-    }
-    [_objects insertObject:[NSDate date] atIndex:0];
-    NSIndexPath *indexPath = [NSIndexPath indexPathForRow:0 inSection:0];
-    [self.tableView insertRowsAtIndexPaths:[NSArray arrayWithObject:indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
+    // login
+    [UIApplication sharedApplication].networkActivityIndicatorVisible = YES;
+    [[SPExampleFacebookClient sharedClient] login:^(BOOL success, id result, NSError *error) {
+        NSLog(@"%i,%@,%@",success,result,error);
+        if (success) {
+        
+            // get our friends
+            [[SPExampleFacebookClient sharedClient] requestWithPath:@"me/friends" completionHandler:^(BOOL success, id result, NSError *error) {
+                if (!success) {
+                    NSLog(@"%@",error);
+                    return;
+                }
+                [_objects removeAllObjects];
+                [_objects addObjectsFromArray:[result valueForKey:@"data"]];
+                [self.tableView reloadData];
+                [UIApplication sharedApplication].networkActivityIndicatorVisible = NO;
+            }];
+        }
+        else {
+            [UIApplication sharedApplication].networkActivityIndicatorVisible = NO;
+        }
+    }];
 }
 
 #pragma mark - Table View
@@ -90,8 +136,8 @@
     }
 
 
-    NSDate *object = [_objects objectAtIndex:indexPath.row];
-    cell.textLabel.text = [object description];
+    NSDictionary *object = [_objects objectAtIndex:indexPath.row];
+    cell.textLabel.text = [object valueForKey:@"name"];
     return cell;
 }
 
